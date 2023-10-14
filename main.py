@@ -1,6 +1,9 @@
 import openai
 import os
 from dotenv import load_dotenv
+import sys
+import time
+import threading
 
 load_dotenv()
 
@@ -8,16 +11,17 @@ KEY_API = os.getenv('KEY_API')
 MODEL = os.getenv('MODEL')
 
 
-def generate_chat_response(rules: str, input_question: str, key_api: str = KEY_API, temperature: int = 7,
-                           model: str = MODEL):
+def generate_response(rules: str, question: str, temperature: int, result: list, key_api: str = KEY_API, model: str = MODEL):
     """
-    Gera uma resposta relacionada a pergunta do usuário em conjunto com as regras estabelecidas de como a IA deve responder
-    :param model: Tipo do modelo do GPT usada
-    :param rules: As regras da conversa, definidas pelo usuário.
-    :param input_question:  A pergunta do usuário.
-    :param key_api: chave API do usuário adquirida pela OpenAI
-    :param temperature: Valor de parâmetro de quanto a resposta pode fugir da regra
-    :return: A resposta gerada pela OpenAI com base na pergunta.
+    Gera uma resposta da inteligência artificial da OpenAI com base em uma pergunta do usuário e regras específicas da conversa.
+
+    :param rules: As regras da conversa, orientando a resposta da IA.
+    :param question: A pergunta do usuário para a qual você quer uma resposta.
+    :param temperature: Controla a criatividade da resposta (0 para conservadora, 10 para mais criativa - fugindo mais da regra ou assunto).
+    :param result: Uma lista onde a resposta gerada será armazenada.
+    :param key_api: A chave de API para autenticação com a OpenAI.
+    :param model: O modelo GPT específico a ser utilizado para gerar a resposta.
+    :return:
     """
     openai.api_key = key_api
 
@@ -26,42 +30,61 @@ def generate_chat_response(rules: str, input_question: str, key_api: str = KEY_A
 
     response = openai.ChatCompletion.create(
         model=model,
-        messages=[{"role": "system", "content": rules.encode('utf-8')}, {"role": "user", "content": input_question.encode('utf-8')}],
-        temperature=int(temperature // 10)
+        messages=[{"role": "system", "content": rules}, {"role": "user", "content": question}],
+        temperature=int(temperature / 10)
     )
 
-    reply = response.choices[0].message.content.encode('utf-8')
+    reply = response.choices[0].message.content
 
     if reply:
-        with open('resposta.txt', "+w", encoding='utf-8') as arquivo_saida:
+        with open('resposta.txt', "w", encoding='utf-8') as arquivo_saida:
             arquivo_saida.write(reply)
-        print("Resposta processada e salva em resposta.txt.")
-    else:
-        print("Ocorreu um erro ao processar a resposta.")
+        result.append(reply)
 
-    return reply
+
+def animation():
+    movement_chars = "-\|/"
+    while not response_ready:
+        for char in movement_chars:
+            sys.stdout.write(f"\r{char} Processando")
+            sys.stdout.flush()
+            time.sleep(0.1)
 
 
 if __name__ == "__main__":
-    print("Digite 'q' para sair a qualquer momento")
+    response_ready = False
+    response = list()
+
+    print("Digite 'q' a qualquer momento para sair.")
     rules = input("Por favor, defina as regras do chat (tópico específico, formato das respostas, etc):\n\n")
     if rules.lower() == 'q':
         quit()
     while True:
         try:
-            temperature = input("Em uma escala de 0 a 10, o quanto você deseja que a resposta se afaste das regras?"
-                                    "Informe um numero : ")
-            if temperature != 'q':
-                temperature = int(temperature)
-            else:
+            temperature = input("\nEm uma escala de 0 a 10, o quanto você deseja que a resposta se afaste das regras? "
+                                "Informe um número: ")
+            if temperature.lower() == 'q':
                 quit()
-            break
+            temperature = int(temperature)
+            if 0 <= temperature <= 10:
+                break
+            else:
+                print("Por favor, insira um valor entre 0 e 10.")
         except ValueError:
-            print("Digite apenas numeros inteiros")
-            continue
-    question = input("Pergunta:\n\n")
+            print("Por favor, insira um valor numérico.")
+    while True:
+        question = input("Pergunta (digite 'q' para sair):\n")
+        if question.lower() == 'q':
+            break
 
-    while question.lower() != 'q':
-        resp = generate_chat_response(rules, question)
-        print(resp, '\n\n')
-        question = input("\n\nPergunta (digite 'q' para sair):\n\n")
+        animation_thread = threading.Thread(target=animation)
+        animation_thread.start()
+        response_thread = threading.Thread(target=generate_response, args=(rules, question, temperature, response))
+        response_thread.start()
+
+        response_thread.join()
+        response_ready = True
+        animation_thread.join()
+
+        if question.lower() != 'q':
+            print("\n\n", response[0], '\n')
