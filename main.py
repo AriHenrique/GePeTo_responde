@@ -5,10 +5,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 KEY_API = os.getenv('KEY_API')
+MODEL = os.getenv('MODEL')
 
 
 def generate_chat_response(rules: str, input_question: str, key_api: str = KEY_API, temperature: int = 7,
-                           model: str = 'gpt-3.5-turbo-16k'):
+                           model: str = MODEL):
     """
     Gera uma resposta relacionada a pergunta do usuário em conjunto com as regras estabelecidas de como a IA deve responder
     :param model: Tipo do modelo do GPT usada
@@ -42,19 +43,25 @@ def generate_chat_response(rules: str, input_question: str, key_api: str = KEY_A
 
 
 if __name__ == "__main__":
+    print("Digite 'q' para sair a qualquer momento")
     rules = input("Por favor, defina as regras do chat (tópico específico, formato das respostas, etc):\n\n")
+    if rules.lower() == 'q':
+        quit()
     while True:
         try:
-            temperature = int(input("Em uma escala de 0 a 10, o quanto você deseja que a resposta se afaste das regras?"
-                                    "Informe um número: "))
+            temperature = input("Em uma escala de 0 a 10, o quanto você deseja que a resposta se afaste das regras?"
+                                    "Informe um numero : ")
+            if temperature != 'q':
+                temperature = int(temperature)
+            else:
+                quit()
             break
         except ValueError:
             print("Digite apenas numeros inteiros")
             continue
-    model = input("Você deseja usar um modelo diferente do usado no script ('gpt-3.5-turbo-16k')? (S/N): ").lower()
-    key = input("Você deseja usar uma chave API diferente? (S/N): ").lower()
-    question = input("Pergunta (digite 'q' para sair):\n\n")
+    question = input("Pergunta:\n\n")
+
     while question.lower() != 'q':
-        question = generate_chat_response(rules, question)
-        quest = input("\n\nPergunta (digite 'q' para sair):\n\n")
-        print(question)
+        resp = generate_chat_response(rules, question)
+        print(resp, '\n\n')
+        question = input("\n\nPergunta (digite 'q' para sair):\n\n")
