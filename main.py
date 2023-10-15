@@ -9,7 +9,7 @@ load_dotenv()
 
 KEY_API = os.getenv('KEY_API')
 MODEL = os.getenv('MODEL')
-
+RESPONSE_READY = False
 
 def generate_response(rules: str, question: str, temperature: int, result: list, key_api: str = KEY_API, model: str = MODEL):
     """
@@ -27,12 +27,15 @@ def generate_response(rules: str, question: str, temperature: int, result: list,
 
     if temperature > 10 or temperature < 0:
         temperature = 10
-
-    response = openai.ChatCompletion.create(
-        model=model,
-        messages=[{"role": "system", "content": rules}, {"role": "user", "content": question}],
-        temperature=int(temperature / 10)
-    )
+    try:
+        response = openai.ChatCompletion.create(
+            model=model,
+            messages=[{"role": "system", "content": rules}, {"role": "user", "content": question}],
+            temperature=int(temperature / 10)
+        )
+    except openai.error.ServiceUnavailableError:
+        print("\n\nERRO: GPT congestionado, tente novamente mais tarde")
+        return
 
     reply = response.choices[0].message.content
 
@@ -40,20 +43,20 @@ def generate_response(rules: str, question: str, temperature: int, result: list,
         with open('resposta.txt', "w", encoding='utf-8') as arquivo_saida:
             arquivo_saida.write(reply)
         result.append(reply)
+    print('\n\n',reply)
 
 
 def animation():
     movement_chars = "-\|/"
-    while not response_ready:
+    while not RESPONSE_READY:
         for char in movement_chars:
-            sys.stdout.write(f"\r{char} Processando")
-            sys.stdout.flush()
-            time.sleep(0.1)
+            if not RESPONSE_READY:
+                sys.stdout.write(f"\r{char} Processando")
+                sys.stdout.flush()
+                time.sleep(0.1)
 
 
 if __name__ == "__main__":
-    response_ready = False
-    response = list()
 
     print("Digite 'q' a qualquer momento para sair.")
     rules = input("Por favor, defina as regras do chat (tópico específico, formato das respostas, etc):\n\n")
@@ -73,7 +76,8 @@ if __name__ == "__main__":
         except ValueError:
             print("Por favor, insira um valor numérico.")
     while True:
-        question = input("Pergunta (digite 'q' para sair):\n")
+        response = list()
+        question = input("\nPergunta (digite 'q' para sair):\n")
         if question.lower() == 'q':
             break
 
@@ -83,8 +87,5 @@ if __name__ == "__main__":
         response_thread.start()
 
         response_thread.join()
-        response_ready = True
+        RESPONSE_READY = True
         animation_thread.join()
-
-        if question.lower() != 'q':
-            print("\n\n", response[0], '\n')
